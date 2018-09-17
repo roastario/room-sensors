@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+
+<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.10/lodash.min.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="http://momentjs.com/downloads/moment.js"></script>
+<script src="http://momentjs.com/downloads/moment-timezone-with-data-2012-2022.js"></script>
+
+
+<script>
+    function loadPage(windowSize, windows) {
+        $.getJSON(`/measurements?window_size=${windowSize}&windows=${windows}`, function (data) {
+            const timezoneOffset = new Date().getTimezoneOffset();
+            const measurementsBySensor = _.groupBy(
+                _.map(data, function (measurement) {
+                    return {
+                        'sensor': measurement.sensor,
+                        'temp': measurement.temp,
+                        'timestamp': moment.tz(measurement.timestamp, 'UTC').valueOf() - timezoneOffset * 60 * 1000
+                    }
+                }),
+                function (itemToKey) {
+                    return itemToKey.sensor
+                }
+            );
+
+            _.sortBy(_.keys(measurementsBySensor), _.identity).forEach(function (i) {
+
+                const rootContainer = document.getElementById('rootContainer');
+                rootContainer.innerHTML = "";
+                const newDiv = document.createElement('div');
+                newDiv.setAttribute("id", `'container${i}'`);
+                rootContainer.appendChild(newDiv);
+
+                data = measurementsBySensor[i];
+                Highcharts.chart(newDiv, {
+                    chart: {
+                        zoomType: 'x'
+                    },
+                    title: {
+                        text: `Sensor: ${i}`
+                    },
+                    xAxis: {
+                        type: 'datetime'
+                    },
+                    yAxis: {
+                        min: 10,
+                        max: 40,
+                        title: {
+                            text: 'Temp C'
+                        }
+                    },
+                    legend: {
+                        enabled: false
+                    },
+                    plotOptions: {
+                        area: {
+                            fillColor: {
+                                linearGradient: {
+                                    x1: 0,
+                                    y1: 0,
+                                    x2: 0,
+                                    y2: 1
+                                },
+                                stops: [
+                                    [0, Highcharts.getOptions().colors[0]],
+                                    [1, Highcharts.Color(Highcharts.getOptions().colors[0]).setOpacity(0).get('rgba')]
+                                ]
+                            },
+                            marker: {
+                                radius: 2
+                            },
+                            lineWidth: 1,
+                            states: {
+                                hover: {
+                                    lineWidth: 1
+                                }
+                            },
+                            threshold: null
+                        }
+                    },
+
+                    series: [{
+                        type: 'area',
+                        name: "sensor_data",
+                        data: _.map(data, function (item) {
+                            return [item.timestamp, item.temp]
+                        })
+                    }]
+                });
+
+            })
+        })
+    }
+
+    function onSelectTimeWindow() {
+        loadPage(this.event.target.selectedOptions[0].dataset.windowSize, this.event.target.selectedOptions[0].dataset.windows)
+    }
+    loadPage(1, 60)
+</script>
+<body>
+<select onchange="onSelectTimeWindow()">
+    <option data-window-size="1" data-windows="60">Hour</option>
+    <option data-window-size="1" data-windows="120">2 Hours</option>
+    <option data-window-size="2" data-windows="180">6 Hours</option>
+    <option data-window-size="4" data-windows="180">12 Hours</option>
+    <option data-window-size="4" data-windows="360">24 Hours</option>
+    <option data-window-size="8" data-windows="360">48 Hours</option>
+    <option data-window-size="16" data-windows="360">96 Hours</option>
+</select>
+<span id="rootContainer">
+
+</span>
+</body>
+</html>
